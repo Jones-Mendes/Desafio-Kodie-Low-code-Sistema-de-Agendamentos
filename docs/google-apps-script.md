@@ -16,7 +16,7 @@ function doPost(e) {
         .setMimeType(ContentService.MimeType.JSON);
     }
 
-    var ss = SpreadsheetApp.openById("SEU_SPREADSHEET_ID");
+    var ss = SpreadsheetApp.openById("1SvvselyAWouAN7zlZgrMFHm4qXW-ifyNSMFGpR3i9FM");
     var summarySheet = ss.getSheetByName("Credenciamentos");
     var answersSheet = ss.getSheetByName("RespostasQuiz");
 
