@@ -12,6 +12,30 @@ dist
 dist-ssr
 *.local
 
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Keys / certificates
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.jks
+*.keystore
+*.kdbx
+
+# Databases / dumps / backups
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+*.dump
+*.bak
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -24,4 +48,3 @@ dist-ssr
 *.sw?
 
 .config/
-!.env

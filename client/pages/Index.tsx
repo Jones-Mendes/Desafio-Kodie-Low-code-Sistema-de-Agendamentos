@@ -13,16 +13,137 @@ import {
   Footprints,
   Shield,
 } from "lucide-react";
+import {
+  CredentialQuizAnswer,
+  FinalizeCredentialResponse,
+  VisitSchedulingRequest,
+  VisitSchedulingResponse,
+} from "@shared/api";
+
+type SchedulingFormState = {
+  fullName: string;
+  email: string;
+  company: string;
+  documentId: string;
+  visitDate: string;
+  visitTime: string;
+  notes: string;
+  acceptedSafetyRules: boolean;
+};
+
+type SecurityQuizAnswers = {
+  prohibitedItem: string;
+  mandatoryEquipment: string;
+  openShoesRule: string;
+  sleevelessShirtRule: string;
+  beforeAccessStep: string;
+};
+
+const quizQuestions = {
+  prohibitedItem: {
+    question: "Qual item e proibido nas instalacoes?",
+    options: {
+      colete: "Colete de seguranca",
+      shorts: "Shorts",
+      capacete: "Capacete",
+    },
+  },
+  mandatoryEquipment: {
+    question: "Qual equipamento e de uso obrigatorio?",
+    options: {
+      chapeu: "Chapeu",
+      capacete: "Capacete",
+      oculos: "Oculos escuros",
+    },
+  },
+  openShoesRule: {
+    question: "Sapatos abertos sao permitidos?",
+    options: {
+      permitido: "Permitido",
+      proibido: "Proibido",
+    },
+  },
+  sleevelessShirtRule: {
+    question: "Regatas podem ser usadas durante a visita?",
+    options: {
+      permitido: "Sim",
+      proibido: "Nao",
+    },
+  },
+  beforeAccessStep: {
+    question: "O que deve ser feito antes de acessar as instalacoes?",
+    options: {
+      treinamento: "Assistir ao treinamento obrigatorio de seguranca",
+      nenhuma: "Nao e necessario nenhum procedimento previo",
+    },
+  },
+} satisfies Record<
+  keyof SecurityQuizAnswers,
+  {
+    question: string;
+    options: Record<string, string>;
+  }
+>;
+
+const isWeekday = (dateValue: string) => {
+  const date = new Date(`${dateValue}T00:00:00`);
+  const day = date.getDay();
+  return day >= 1 && day <= 5;
+};
+
+const isAllowedTime = (timeValue: string) => {
+  return timeValue >= "08:00" && timeValue <= "17:00";
+};
+
+const getTodayISO = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 export default function Index() {
   const [currentStep, setCurrentStep] = useState(0);
+  const [schedulingCompleted, setSchedulingCompleted] = useState(false);
+  const [quizApproved, setQuizApproved] = useState(false);
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [isFinalizingCredential, setIsFinalizingCredential] = useState(false);
+  const [schedulingSuccess, setSchedulingSuccess] = useState<string | null>(null);
+  const [schedulingError, setSchedulingError] = useState<string | null>(null);
+  const [schedulingProtocol, setSchedulingProtocol] = useState<string | null>(null);
+  const [submittedSchedulingData, setSubmittedSchedulingData] =
+    useState<VisitSchedulingRequest | null>(null);
+  const [schedulingForm, setSchedulingForm] = useState<SchedulingFormState>({
+    fullName: "",
+    email: "",
+    company: "",
+    documentId: "",
+    visitDate: "",
+    visitTime: "",
+    notes: "",
+    acceptedSafetyRules: false,
+  });
+  const [quizAnswers, setQuizAnswers] = useState<SecurityQuizAnswers>({
+    prohibitedItem: "",
+    mandatoryEquipment: "",
+    openShoesRule: "",
+    sleevelessShirtRule: "",
+    beforeAccessStep: "",
+  });
+  const [quizError, setQuizError] = useState<string | null>(null);
+  const [quizResult, setQuizResult] = useState<{
+    score: number;
+    passed: boolean;
+  } | null>(null);
+  const todayISO = getTodayISO();
 
   const steps = [
-    { number: 1, title: "Agendamento", icon: Clock },
-    { number: 2, title: "Segurança", icon: ShieldAlert },
-    { number: 3, title: "Vídeo", icon: Video },
-    { number: 4, title: "Quiz", icon: FileText },
-    { number: 5, title: "Confirmação", icon: CheckCircle },
+    { number: 1, title: "Agendamento", icon: Clock, sectionId: "scheduling" },
+    { number: 2, title: "Segurança", icon: ShieldAlert, sectionId: "security" },
+    { number: 3, title: "Vídeo", icon: Video, sectionId: "training" },
+    { number: 4, title: "Quiz", icon: FileText, sectionId: "quiz" },
+    { number: 5, title: "Confirmação", icon: CheckCircle, sectionId: "confirmation" },
   ];
 
   const scrollToSection = (id: string) => {
@@ -30,6 +151,232 @@ export default function Index() {
     if (element) {
       element.scrollIntoView({ behavior: "smooth" });
     }
+  };
+
+  const handleSchedulingChange = (
+    field: keyof SchedulingFormState,
+    value: string | boolean,
+  ) => {
+    setSchedulingForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSchedulingSubmit = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+    setSchedulingError(null);
+    setSchedulingSuccess(null);
+    setSchedulingProtocol(null);
+    setIsScheduling(true);
+
+    if (schedulingForm.visitDate < todayISO) {
+      setSchedulingError("Não é permitido agendar para datas passadas.");
+      setIsScheduling(false);
+      return;
+    }
+
+    if (!isWeekday(schedulingForm.visitDate)) {
+      setSchedulingError("O agendamento deve ser realizado apenas em dias úteis.");
+      setIsScheduling(false);
+      return;
+    }
+
+    if (!isAllowedTime(schedulingForm.visitTime)) {
+      setSchedulingError("O horário permitido é de 08:00 às 17:00.");
+      setIsScheduling(false);
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/visit-scheduling", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(schedulingForm),
+      });
+
+      const data = (await response.json()) as
+        | VisitSchedulingResponse
+        | { message?: string };
+
+      if (!response.ok) {
+        setSchedulingError(
+          data.message ?? "Não foi possível registrar o agendamento.",
+        );
+        return;
+      }
+
+      setSchedulingSuccess(
+        data.message ?? "Agendamento enviado com sucesso para validação.",
+      );
+      setSubmittedSchedulingData({
+        fullName: schedulingForm.fullName,
+        email: schedulingForm.email,
+        company: schedulingForm.company,
+        documentId: schedulingForm.documentId,
+        visitDate: schedulingForm.visitDate,
+        visitTime: schedulingForm.visitTime,
+        notes: schedulingForm.notes,
+        acceptedSafetyRules: schedulingForm.acceptedSafetyRules,
+      });
+      setSchedulingCompleted(true);
+      setCurrentStep(1);
+      if ("protocol" in data && typeof data.protocol === "string") {
+        setSchedulingProtocol(data.protocol);
+      }
+
+      setSchedulingForm({
+        fullName: "",
+        email: "",
+        company: "",
+        documentId: "",
+        visitDate: "",
+        visitTime: "",
+        notes: "",
+        acceptedSafetyRules: false,
+      });
+    } catch {
+      setSchedulingError("Erro de conexão. Tente novamente em alguns minutos.");
+    } finally {
+      setIsScheduling(false);
+    }
+  };
+
+  const handleQuizChange = (
+    field: keyof SecurityQuizAnswers,
+    value: string,
+  ) => {
+    setQuizAnswers((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleQuizSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setQuizError(null);
+
+    const unanswered = Object.values(quizAnswers).some((answer) => !answer);
+    if (unanswered) {
+      setQuizResult(null);
+      setQuizError("Responda todas as perguntas antes de enviar a avaliação.");
+      return;
+    }
+
+    const correctAnswers: SecurityQuizAnswers = {
+      prohibitedItem: "shorts",
+      mandatoryEquipment: "capacete",
+      openShoesRule: "proibido",
+      sleevelessShirtRule: "proibido",
+      beforeAccessStep: "treinamento",
+    };
+
+    const score = Object.entries(correctAnswers).reduce((total, [key, value]) => {
+      const answer = quizAnswers[key as keyof SecurityQuizAnswers];
+      return answer === value ? total + 1 : total;
+    }, 0);
+
+    const detailedAnswers: CredentialQuizAnswer[] = Object.entries(
+      correctAnswers,
+    ).map(([key, correctValue]) => {
+      const questionKey = key as keyof SecurityQuizAnswers;
+      const selectedValue = quizAnswers[questionKey];
+      const config = quizQuestions[questionKey];
+
+      return {
+        key,
+        question: config.question,
+        selectedAnswer: config.options[selectedValue] ?? selectedValue,
+        correctAnswer: config.options[correctValue] ?? correctValue,
+        isCorrect: selectedValue === correctValue,
+      };
+    });
+
+    const passed = score >= 4;
+    setQuizResult({ score, passed });
+
+    if (passed) {
+      if (!submittedSchedulingData || !schedulingProtocol) {
+        setQuizApproved(false);
+        setQuizError(
+          "Os dados do agendamento nao foram encontrados. Reenvie o formulario antes de concluir o quiz.",
+        );
+        return;
+      }
+
+      setIsFinalizingCredential(true);
+
+      try {
+        const response = await fetch("/api/finalize-credential", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            protocol: schedulingProtocol,
+            scheduling: submittedSchedulingData,
+            quiz: {
+              score,
+              totalQuestions: 5,
+              approved: true,
+              answeredAt: new Date().toISOString(),
+              answers: detailedAnswers,
+            },
+          }),
+        });
+
+        const data = (await response.json()) as
+          | FinalizeCredentialResponse
+          | { message?: string };
+
+        if (!response.ok) {
+          setQuizApproved(false);
+          setQuizError(
+            data.message ??
+              "Falha ao enviar os dados finais para planilha e e-mail.",
+          );
+          return;
+        }
+
+        setQuizApproved(true);
+        setCurrentStep(4);
+        scrollToSection("confirmation");
+      } catch {
+        setQuizApproved(false);
+        setQuizError(
+          "Erro de conexao ao finalizar o credenciamento. Tente novamente.",
+        );
+      } finally {
+        setIsFinalizingCredential(false);
+      }
+
+      return;
+    }
+
+    setQuizApproved(false);
+  };
+
+  const handleQuizReset = () => {
+    setQuizAnswers({
+      prohibitedItem: "",
+      mandatoryEquipment: "",
+      openShoesRule: "",
+      sleevelessShirtRule: "",
+      beforeAccessStep: "",
+    });
+    setQuizError(null);
+    setQuizResult(null);
+    setQuizApproved(false);
+  };
+
+  const securityLocked = !schedulingCompleted;
+  const trainingLocked = !schedulingCompleted;
+  const quizLocked = !schedulingCompleted;
+
+  const canAccessStep = (index: number) => {
+    if (index === 0) {
+      return true;
+    }
+
+    if (index >= 1 && index <= 3) {
+      return schedulingCompleted;
+    }
+
+    return schedulingCompleted && quizApproved;
   };
 
   return (
@@ -219,15 +566,25 @@ export default function Index() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {steps.map((step, idx) => {
               const Icon = step.icon;
+              const isLocked = !canAccessStep(idx);
               return (
                 <div
                   key={idx}
-                  className={`p-4 rounded-lg border-2 transition-all duration-300 cursor-pointer hover:shadow-lg ${
+                  className={`p-4 rounded-lg border-2 transition-all duration-300 ${
                     idx <= currentStep
                       ? "border-ws-navy bg-blue-50"
                       : "border-gray-200 bg-gray-50"
+                  } ${
+                    isLocked
+                      ? "cursor-not-allowed opacity-60"
+                      : "cursor-pointer hover:shadow-lg"
                   }`}
-                  onClick={() => setCurrentStep(idx)}
+                  onClick={() => {
+                    if (!isLocked) {
+                      setCurrentStep(idx);
+                      scrollToSection(step.sectionId);
+                    }
+                  }}
                 >
                   <div className="flex flex-col items-center gap-2">
                     <Icon
@@ -259,28 +616,176 @@ export default function Index() {
               Sons.
             </p>
 
-            {/* Google Forms iframe container */}
-            <div className="rounded-lg overflow-hidden shadow-md border border-border">
-              {/* COLAR IFRAME FORMULÁRIO DE AGENDAMENTO AQUI */}
-              <iframe
-                src="COLE_AQUI_O_IFRAME_DO_FORMULARIO_DE_AGENDAMENTO"
-                width="100%"
-                height="900"
-                frameBorder="0"
-                marginHeight={0}
-                marginWidth={0}
-                className="block"
-              >
-                Carregando…
-              </iframe>
-            </div>
+            <form onSubmit={handleSchedulingSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="flex flex-col gap-2 text-sm font-medium text-ws-navy">
+                  Nome completo
+                  <input
+                    type="text"
+                    required
+                    value={schedulingForm.fullName}
+                    onChange={(e) =>
+                      handleSchedulingChange("fullName", e.target.value)
+                    }
+                    placeholder="Seu nome"
+                    className="h-11 rounded-lg border border-border px-3 text-base"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-2 text-sm font-medium text-ws-navy">
+                  E-mail
+                  <input
+                    type="email"
+                    required
+                    value={schedulingForm.email}
+                    onChange={(e) => handleSchedulingChange("email", e.target.value)}
+                    placeholder="voce@empresa.com"
+                    className="h-11 rounded-lg border border-border px-3 text-base"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-2 text-sm font-medium text-ws-navy">
+                  Empresa
+                  <input
+                    type="text"
+                    required
+                    value={schedulingForm.company}
+                    onChange={(e) => handleSchedulingChange("company", e.target.value)}
+                    placeholder="Nome da empresa"
+                    className="h-11 rounded-lg border border-border px-3 text-base"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-2 text-sm font-medium text-ws-navy">
+                  Documento (CPF/RG)
+                  <input
+                    type="text"
+                    required
+                    value={schedulingForm.documentId}
+                    onChange={(e) =>
+                      handleSchedulingChange("documentId", e.target.value)
+                    }
+                    placeholder="Informe seu documento"
+                    className="h-11 rounded-lg border border-border px-3 text-base"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-2 text-sm font-medium text-ws-navy">
+                  Data da visita
+                  <input
+                    type="date"
+                    required
+                    min={todayISO}
+                    value={schedulingForm.visitDate}
+                    onChange={(e) => {
+                      const selectedDate = e.target.value;
+                      if (!selectedDate) {
+                        handleSchedulingChange("visitDate", selectedDate);
+                        return;
+                      }
+
+                      if (selectedDate < todayISO) {
+                        setSchedulingError("Não é permitido agendar para datas passadas.");
+                        return;
+                      }
+
+                      if (!isWeekday(selectedDate)) {
+                        setSchedulingError("Selecione apenas dias úteis (segunda a sexta).");
+                        return;
+                      }
+
+                      setSchedulingError(null);
+                      handleSchedulingChange("visitDate", selectedDate);
+                    }}
+                    className="h-11 rounded-lg border border-border px-3 text-base"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-2 text-sm font-medium text-ws-navy">
+                  Horário previsto
+                  <input
+                    type="time"
+                    required
+                    min="08:00"
+                    max="17:00"
+                    step={1800}
+                    value={schedulingForm.visitTime}
+                    onChange={(e) => {
+                      const selectedTime = e.target.value;
+                      if (!selectedTime) {
+                        handleSchedulingChange("visitTime", selectedTime);
+                        return;
+                      }
+
+                      if (!isAllowedTime(selectedTime)) {
+                        setSchedulingError("Informe um horário entre 08:00 e 17:00.");
+                        return;
+                      }
+
+                      setSchedulingError(null);
+                      handleSchedulingChange("visitTime", selectedTime);
+                    }}
+                    className="h-11 rounded-lg border border-border px-3 text-base"
+                  />
+                </label>
+              </div>
+
+              <label className="flex flex-col gap-2 text-sm font-medium text-ws-navy">
+                Observações
+                <textarea
+                  value={schedulingForm.notes}
+                  onChange={(e) => handleSchedulingChange("notes", e.target.value)}
+                  placeholder="Informações adicionais da visita"
+                  rows={4}
+                  className="rounded-lg border border-border px-3 py-2 text-base"
+                />
+              </label>
+
+              <label className="flex items-start gap-3 text-sm text-ws-slate">
+                <input
+                  type="checkbox"
+                  required
+                  checked={schedulingForm.acceptedSafetyRules}
+                  onChange={(e) =>
+                    handleSchedulingChange("acceptedSafetyRules", e.target.checked)
+                  }
+                  className="mt-1 h-4 w-4 rounded border-border"
+                />
+                Declaro que li e aceito cumprir os requisitos obrigatórios de
+                segurança para acesso às instalações.
+              </label>
+
+              <div className="flex flex-col gap-3">
+                <button
+                  type="submit"
+                  disabled={isScheduling}
+                  className="btn-primary w-full md:w-auto disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isScheduling ? "Enviando agendamento..." : "Enviar agendamento"}
+                </button>
+
+                {schedulingError && (
+                  <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {schedulingError}
+                  </p>
+                )}
+
+                {schedulingSuccess && (
+                  <p className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+                    {schedulingSuccess}
+                    {schedulingProtocol && ` Protocolo: ${schedulingProtocol}.`}
+                  </p>
+                )}
+              </div>
+            </form>
           </div>
         </div>
       </section>
 
       {/* Security Requirements Section */}
-      <section id="security" className="py-16 px-4 sm:px-6 lg:px-8 bg-white">
+      <section id="security" className="relative py-16 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-7xl mx-auto">
+          <div className={securityLocked ? "pointer-events-none opacity-40 select-none" : ""}>
           <div className="text-center mb-12">
             <h2 className="section-title">Requisitos Obrigatórios de Segurança</h2>
             <p className="section-subtitle">
@@ -352,12 +857,32 @@ export default function Index() {
               </div>
             </div>
           </div>
+          </div>
+
+          {securityLocked && (
+            <div className="absolute inset-0 flex items-center justify-center px-6">
+              <div className="max-w-xl rounded-xl border border-ws-sky bg-white/95 p-6 text-center shadow-xl backdrop-blur-sm">
+                <h3 className="mb-2 text-xl font-bold text-ws-navy">Etapa bloqueada</h3>
+                <p className="mb-4 text-ws-slate">
+                  Finalize o formulário de agendamento para liberar as etapas de segurança.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => scrollToSection("scheduling")}
+                  className="btn-primary"
+                >
+                  Ir para Agendamento
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
       {/* Training Video Section */}
-      <section id="training" className="py-16 px-4 sm:px-6 lg:px-8 bg-ws-light">
+      <section id="training" className="relative py-16 px-4 sm:px-6 lg:px-8 bg-ws-light">
         <div className="max-w-5xl mx-auto">
+          <div className={trainingLocked ? "pointer-events-none opacity-40 select-none" : ""}>
           <div className="text-center mb-12">
             <h2 className="section-title">Treinamento de Segurança</h2>
             <p className="section-subtitle">
@@ -372,7 +897,7 @@ export default function Index() {
             <iframe
               width="100%"
               height="600"
-              src="COLE_AQUI_O_IFRAME_DO_VIDEO"
+              src="https://www.youtube.com/embed/EqGF7HkI-GY"
               title="Treinamento de Segurança"
               className="block"
             ></iframe>
@@ -381,17 +906,36 @@ export default function Index() {
           <p className="text-center mt-8 text-ws-slate text-lg">
             Após assistir ao vídeo, realize a avaliação de segurança.
           </p>
+          </div>
+
+          {trainingLocked && (
+            <div className="absolute inset-0 flex items-center justify-center px-6">
+              <div className="max-w-xl rounded-xl border border-ws-sky bg-white/95 p-6 text-center shadow-xl backdrop-blur-sm">
+                <h3 className="mb-2 text-xl font-bold text-ws-navy">Treinamento bloqueado</h3>
+                <p className="mb-4 text-ws-slate">
+                  Envie o agendamento da visita para liberar esta etapa.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => scrollToSection("scheduling")}
+                  className="btn-primary"
+                >
+                  Ir para Agendamento
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
       {/* Security Quiz Section */}
-      <section id="quiz" className="py-16 px-4 sm:px-6 lg:px-8 bg-white">
+      <section id="quiz" className="relative py-16 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-4xl mx-auto">
+          <div className={quizLocked ? "pointer-events-none opacity-40 select-none" : ""}>
           <div className="text-center mb-12">
-            <h2 className="section-title">Avaliação de Segurança</h2>
-            <p className="section-subtitle">
-              Para concluir seu credenciamento é necessário obter aprovação no
-              questionário de segurança.
+            <h2 className="section-title">Quiz de Avaliação de Segurança</h2>
+            <p className="section-subtitle mx-auto">
+              Para concluir seu credenciamento é necessário obter aprovação no questionário de segurança.
             </p>
           </div>
 
@@ -409,46 +953,269 @@ export default function Index() {
             </div>
           </div>
 
-          {/* Quiz iframe container */}
-          <div className="rounded-lg overflow-hidden shadow-md border border-border">
-            {/* COLAR IFRAME FORMULÁRIO QUIZ AQUI */}
-            <iframe
-              src="COLE_AQUI_O_IFRAME_DO_FORMULARIO_QUIZ"
-              width="100%"
-              height="900"
-              frameBorder="0"
-              marginHeight={0}
-              marginWidth={0}
-              className="block"
-            >
-              Carregando…
-            </iframe>
+          <form
+            onSubmit={handleQuizSubmit}
+            className="rounded-lg border border-border bg-ws-light p-6 md:p-8 space-y-6"
+          >
+            <fieldset className="space-y-3">
+              <legend className="font-semibold text-ws-navy">
+                1. Qual item é proibido nas instalações?
+              </legend>
+              <label className="flex items-center gap-3 text-ws-slate">
+                <input
+                  type="radio"
+                  name="prohibitedItem"
+                  value="colete"
+                  checked={quizAnswers.prohibitedItem === "colete"}
+                  onChange={(e) =>
+                    handleQuizChange("prohibitedItem", e.target.value)
+                  }
+                />
+                Colete de segurança
+              </label>
+              <label className="flex items-center gap-3 text-ws-slate">
+                <input
+                  type="radio"
+                  name="prohibitedItem"
+                  value="shorts"
+                  checked={quizAnswers.prohibitedItem === "shorts"}
+                  onChange={(e) =>
+                    handleQuizChange("prohibitedItem", e.target.value)
+                  }
+                />
+                Shorts
+              </label>
+              <label className="flex items-center gap-3 text-ws-slate">
+                <input
+                  type="radio"
+                  name="prohibitedItem"
+                  value="capacete"
+                  checked={quizAnswers.prohibitedItem === "capacete"}
+                  onChange={(e) =>
+                    handleQuizChange("prohibitedItem", e.target.value)
+                  }
+                />
+                Capacete
+              </label>
+            </fieldset>
+
+            <fieldset className="space-y-3">
+              <legend className="font-semibold text-ws-navy">
+                2. Qual equipamento é de uso obrigatório?
+              </legend>
+              <label className="flex items-center gap-3 text-ws-slate">
+                <input
+                  type="radio"
+                  name="mandatoryEquipment"
+                  value="chapeu"
+                  checked={quizAnswers.mandatoryEquipment === "chapeu"}
+                  onChange={(e) =>
+                    handleQuizChange("mandatoryEquipment", e.target.value)
+                  }
+                />
+                Chapéu
+              </label>
+              <label className="flex items-center gap-3 text-ws-slate">
+                <input
+                  type="radio"
+                  name="mandatoryEquipment"
+                  value="capacete"
+                  checked={quizAnswers.mandatoryEquipment === "capacete"}
+                  onChange={(e) =>
+                    handleQuizChange("mandatoryEquipment", e.target.value)
+                  }
+                />
+                Capacete
+              </label>
+              <label className="flex items-center gap-3 text-ws-slate">
+                <input
+                  type="radio"
+                  name="mandatoryEquipment"
+                  value="oculos"
+                  checked={quizAnswers.mandatoryEquipment === "oculos"}
+                  onChange={(e) =>
+                    handleQuizChange("mandatoryEquipment", e.target.value)
+                  }
+                />
+                Óculos escuros
+              </label>
+            </fieldset>
+
+            <fieldset className="space-y-3">
+              <legend className="font-semibold text-ws-navy">
+                3. Sapatos abertos são permitidos?
+              </legend>
+              <label className="flex items-center gap-3 text-ws-slate">
+                <input
+                  type="radio"
+                  name="openShoesRule"
+                  value="permitido"
+                  checked={quizAnswers.openShoesRule === "permitido"}
+                  onChange={(e) =>
+                    handleQuizChange("openShoesRule", e.target.value)
+                  }
+                />
+                Permitido
+              </label>
+              <label className="flex items-center gap-3 text-ws-slate">
+                <input
+                  type="radio"
+                  name="openShoesRule"
+                  value="proibido"
+                  checked={quizAnswers.openShoesRule === "proibido"}
+                  onChange={(e) =>
+                    handleQuizChange("openShoesRule", e.target.value)
+                  }
+                />
+                Proibido
+              </label>
+            </fieldset>
+
+            <fieldset className="space-y-3">
+              <legend className="font-semibold text-ws-navy">
+                4. Regatas podem ser usadas durante a visita?
+              </legend>
+              <label className="flex items-center gap-3 text-ws-slate">
+                <input
+                  type="radio"
+                  name="sleevelessShirtRule"
+                  value="permitido"
+                  checked={quizAnswers.sleevelessShirtRule === "permitido"}
+                  onChange={(e) =>
+                    handleQuizChange("sleevelessShirtRule", e.target.value)
+                  }
+                />
+                Sim
+              </label>
+              <label className="flex items-center gap-3 text-ws-slate">
+                <input
+                  type="radio"
+                  name="sleevelessShirtRule"
+                  value="proibido"
+                  checked={quizAnswers.sleevelessShirtRule === "proibido"}
+                  onChange={(e) =>
+                    handleQuizChange("sleevelessShirtRule", e.target.value)
+                  }
+                />
+                Não
+              </label>
+            </fieldset>
+
+            <fieldset className="space-y-3">
+              <legend className="font-semibold text-ws-navy">
+                5. O que deve ser feito antes de acessar as instalações?
+              </legend>
+              <label className="flex items-center gap-3 text-ws-slate">
+                <input
+                  type="radio"
+                  name="beforeAccessStep"
+                  value="treinamento"
+                  checked={quizAnswers.beforeAccessStep === "treinamento"}
+                  onChange={(e) =>
+                    handleQuizChange("beforeAccessStep", e.target.value)
+                  }
+                />
+                Assistir ao treinamento obrigatório de segurança
+              </label>
+              <label className="flex items-center gap-3 text-ws-slate">
+                <input
+                  type="radio"
+                  name="beforeAccessStep"
+                  value="nenhuma"
+                  checked={quizAnswers.beforeAccessStep === "nenhuma"}
+                  onChange={(e) =>
+                    handleQuizChange("beforeAccessStep", e.target.value)
+                  }
+                />
+                Não é necessário nenhum procedimento prévio
+              </label>
+            </fieldset>
+
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="submit"
+                disabled={isFinalizingCredential || quizApproved}
+                className="btn-primary disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isFinalizingCredential
+                  ? "Finalizando credenciamento..."
+                  : "Enviar avaliação"}
+              </button>
+              <button
+                type="button"
+                onClick={handleQuizReset}
+                className="inline-flex items-center justify-center rounded-lg border border-border bg-white px-6 py-3 font-semibold text-ws-navy transition-all duration-300 hover:bg-slate-50"
+              >
+                Refazer avaliação
+              </button>
+            </div>
+
+            {quizError && (
+              <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {quizError}
+              </p>
+            )}
+
+            {quizResult && (
+              <div
+                className={`rounded-lg px-4 py-3 text-sm ${
+                  quizResult.passed
+                    ? "border border-green-200 bg-green-50 text-green-700"
+                    : "border border-yellow-200 bg-yellow-50 text-yellow-700"
+                }`}
+              >
+                {quizResult.passed
+                  ? `Aprovado. Você acertou ${quizResult.score} de 5 perguntas.`
+                  : `Você acertou ${quizResult.score} de 5. Revise o conteúdo de segurança e tente novamente.`}
+              </div>
+            )}
+          </form>
           </div>
+
+          {quizLocked && (
+            <div className="absolute inset-0 flex items-center justify-center px-6">
+              <div className="max-w-xl rounded-xl border border-ws-sky bg-white/95 p-6 text-center shadow-xl backdrop-blur-sm">
+                <h3 className="mb-2 text-xl font-bold text-ws-navy">Avaliação bloqueada</h3>
+                <p className="mb-4 text-ws-slate">
+                  Primeiro conclua o formulário de agendamento para desbloquear o quiz.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => scrollToSection("scheduling")}
+                  className="btn-primary"
+                >
+                  Ir para Agendamento
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
       {/* Success Section */}
-      <section id="confirmation" className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-green-50 to-emerald-50">
-        <div className="max-w-2xl mx-auto text-center">
-          <div className="mb-8 animate-bounce">
-            <CheckCircle className="h-24 w-24 text-green-600 mx-auto" />
+      {quizApproved && (
+        <section id="confirmation" className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-green-50 to-emerald-50">
+          <div className="max-w-2xl mx-auto text-center">
+            <div className="mb-8 animate-bounce">
+              <CheckCircle className="h-24 w-24 text-green-600 mx-auto" />
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold text-green-900 mb-6">
+              Credenciamento Registrado
+            </h2>
+            <p className="text-xl text-green-700 mb-8 leading-relaxed">
+              Seu credenciamento foi enviado com sucesso. Após a validação das
+              informações e conclusão das etapas obrigatórias, você receberá uma
+              confirmação por e-mail.
+            </p>
+            <button
+              onClick={() => scrollToSection("hero")}
+              className="btn-primary gap-2"
+            >
+              Voltar ao Início
+            </button>
           </div>
-          <h2 className="text-4xl md:text-5xl font-bold text-green-900 mb-6">
-            Credenciamento Registrado
-          </h2>
-          <p className="text-xl text-green-700 mb-8 leading-relaxed">
-            Seu credenciamento foi enviado com sucesso. Após a validação das
-            informações e conclusão das etapas obrigatórias, você receberá uma
-            confirmação por e-mail.
-          </p>
-          <button
-            onClick={() => scrollToSection("hero")}
-            className="btn-primary gap-2"
-          >
-            Voltar ao Início
-          </button>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Footer */}
       <footer className="bg-ws-navy text-white py-8 px-4 sm:px-6 lg:px-8">
