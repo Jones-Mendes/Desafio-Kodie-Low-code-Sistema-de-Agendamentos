@@ -446,104 +446,13 @@ export default function Index() {
             <div className="animate-slide-up hidden md:block">
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-ws-sky to-blue-400 rounded-2xl opacity-20 blur-3xl"></div>
-                <div className="relative bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20">
-                  <svg
-                    className="w-full h-auto"
-                    viewBox="0 0 300 300"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    {/* Ship illustration */}
-                    <defs>
-                      <linearGradient id="shipGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" style={{ stopColor: "#fff", stopOpacity: 0.9 }} />
-                        <stop offset="100%" style={{ stopColor: "#e0f2fe", stopOpacity: 0.6 }} />
-                      </linearGradient>
-                    </defs>
-
-                    {/* Water waves */}
-                    <path
-                      d="M 0 220 Q 75 210 150 220 T 300 220 L 300 300 L 0 300 Z"
-                      fill="rgba(255,255,255,0.2)"
-                    />
-
-                    {/* Ship hull */}
-                    <path
-                      d="M 80 160 L 60 200 L 240 200 L 220 160 Z"
-                      fill="url(#shipGradient)"
-                      stroke="rgba(255,255,255,0.4)"
-                      strokeWidth="2"
-                    />
-
-                    {/* Ship deck */}
-                    <rect
-                      x="80"
-                      y="140"
-                      width="140"
-                      height="25"
-                      fill="rgba(255,255,255,0.3)"
-                      stroke="rgba(255,255,255,0.4)"
-                      strokeWidth="2"
-                    />
-
-                    {/* Mast */}
-                    <line
-                      x1="150"
-                      y1="100"
-                      x2="150"
-                      y2="140"
-                      stroke="rgba(255,255,255,0.6)"
-                      strokeWidth="3"
-                    />
-
-                    {/* Crane */}
-                    <g>
-                      <line
-                        x1="150"
-                        y1="100"
-                        x2="200"
-                        y2="70"
-                        stroke="rgba(255,255,255,0.5)"
-                        strokeWidth="2"
-                      />
-                      <circle
-                        cx="200"
-                        cy="70"
-                        r="8"
-                        fill="rgba(255,255,255,0.5)"
-                      />
-                    </g>
-
-                    {/* Containers */}
-                    <g opacity="0.7">
-                      <rect
-                        x="100"
-                        y="120"
-                        width="20"
-                        height="25"
-                        fill="rgba(255,255,255,0.4)"
-                        stroke="rgba(255,255,255,0.5)"
-                        strokeWidth="1"
-                      />
-                      <rect
-                        x="125"
-                        y="115"
-                        width="20"
-                        height="25"
-                        fill="rgba(255,255,255,0.4)"
-                        stroke="rgba(255,255,255,0.5)"
-                        strokeWidth="1"
-                      />
-                      <rect
-                        x="155"
-                        y="118"
-                        width="20"
-                        height="25"
-                        fill="rgba(255,255,255,0.4)"
-                        stroke="rgba(255,255,255,0.5)"
-                        strokeWidth="1"
-                      />
-                    </g>
-                  </svg>
+                <div className="relative bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/20 overflow-hidden">
+                  <img
+                    src="/porto.jpg"
+                    alt="Porto da Wilson Sons"
+                    className="w-full h-[320px] object-cover rounded-xl"
+                    loading="eager"
+                  />
                 </div>
               </div>
             </div>
