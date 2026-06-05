@@ -1,22 +1,30 @@
 # Google Apps Script para Google Sheets
 
-Atualize o Apps Script do seu Web App com o exemplo abaixo para gravar os dados do agendamento (assim que o formulario e enviado) e os dados finais do credenciamento com as respostas do quiz.
+Se voce quer o jeito mais simples para funcionar rapido, use este modo:
 
-Esse modelo usa apenas 1 segredo opcional (token unico): se voce definir esse token no Apps Script, o backend tambem envia o token na requisicao e o script valida.
+- Crie o Apps Script a partir da propria planilha (Extensoes > Apps Script).
+- Nao use openById e nao use token.
+- Use apenas a URL /exec na Vercel em GOOGLE_SHEETS_WEBHOOK_URL.
+
+Script pronto para copiar e colar:
 
 ```javascript
 function doPost(e) {
   try {
-    var body = JSON.parse(e.postData.contents);
-    var expectedToken = PropertiesService.getScriptProperties().getProperty("SHEETS_TOKEN") || "";
-
-    if (expectedToken && body.sheetsToken !== expectedToken) {
-      return ContentService
-        .createTextOutput(JSON.stringify({ ok: false, message: "Token invalido" }))
-        .setMimeType(ContentService.MimeType.JSON);
+    if (!e || !e.postData || !e.postData.contents) {
+      return jsonResponse({ ok: false, message: "Body ausente" });
     }
 
-    var ss = SpreadsheetApp.openById("1SvvselyAWouAN7zlZgrMFHm4qXW-ifyNSMFGpR3i9FM");
+    var body = JSON.parse(e.postData.contents);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    if (!ss) {
+      return jsonResponse({
+        ok: false,
+        message: "Abra este script pela planilha (Extensoes > Apps Script)."
+      });
+    }
+
     var summarySheet = ss.getSheetByName("Credenciamentos");
     var answersSheet = ss.getSheetByName("RespostasQuiz");
 
@@ -82,24 +90,34 @@ function doPost(e) {
       });
     }
 
-    return ContentService
-      .createTextOutput(JSON.stringify({ ok: true }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return jsonResponse({ ok: true });
   } catch (error) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ ok: false, message: String(error) }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return jsonResponse({ ok: false, message: String(error) });
   }
+}
+
+function jsonResponse(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 ```
 
-## Configuracao rapida (sem muitas senhas)
+## Passo a passo rapido (modo simples)
 
-1. No Apps Script, abra Configuracoes do projeto > Propriedades do script.
-2. Crie a propriedade SHEETS_TOKEN com um valor simples (exemplo: ws-2026-token).
-3. Implante como Aplicativo da Web com acesso por URL /exec.
-4. Na Vercel, configure:
-  - GOOGLE_SHEETS_WEBHOOK_URL = URL /exec do Apps Script
-  - GOOGLE_SHEETS_WEBHOOK_TOKEN = mesmo valor de SHEETS_TOKEN
+1. Abra a planilha onde quer salvar os dados.
+2. Va em Extensoes > Apps Script.
+3. Apague o codigo atual e cole o script acima.
+4. Clique em Implantar > Nova implantacao > Aplicativo da Web.
+5. Configure:
+   - Executar como: voce.
+   - Quem tem acesso: Qualquer pessoa.
+6. Copie a URL final que termina com /exec.
+7. Na Vercel, configure apenas:
+   - GOOGLE_SHEETS_WEBHOOK_URL = URL /exec.
+8. Salve e faca Redeploy na Vercel.
 
-Se preferir zero segredos, nao configure SHEETS_TOKEN no Apps Script e nao configure GOOGLE_SHEETS_WEBHOOK_TOKEN na Vercel.
+## Teste rapido
+
+Envie um formulario no site e confirme nova linha na aba Credenciamentos.
+Se nao entrar, abra o Deployments da Vercel e verifique o log da rota /api/visit-scheduling.
