@@ -147,6 +147,7 @@ Configuração principal:
 - Output directory: dist/spa.
 - As rotas de API são atendidas pela Function em api/[...route].ts.
 - Configure na Vercel as variáveis de ambiente usadas pelo backend: GOOGLE_SHEETS_WEBHOOK_URL, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM e, se necessário, NOTIFICATION_EMAIL.
+- Opcional (recomendado): GOOGLE_SHEETS_WEBHOOK_TOKEN para validar um token único no Apps Script.
 - Use [.env.example](.env.example) como referência para cadastrar as variáveis sem expor segredos.
 
 Para o primeiro deploy, basta importar o repositório na Vercel e cadastrar as variáveis de ambiente do backend antes de publicar.

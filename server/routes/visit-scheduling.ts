@@ -26,13 +26,9 @@ const getTodayISO = () => {
   return `${year}-${month}-${day}`;
 };
 
-const requireEnv = (name: string) => {
+const getEnv = (name: string) => {
   const value = process.env[name];
-  if (!value) {
-    throw new Error(`Variavel de ambiente ausente: ${name}`);
-  }
-
-  return value;
+  return typeof value === "string" ? value : "";
 };
 
 export const handleVisitScheduling: RequestHandler = async (req, res) => {
@@ -73,38 +69,41 @@ export const handleVisitScheduling: RequestHandler = async (req, res) => {
   const protocol = `WS-${Date.now().toString().slice(-8)}`;
 
   try {
-    const sheetsWebhookUrl = requireEnv("GOOGLE_SHEETS_WEBHOOK_URL");
+    const sheetsWebhookUrl = getEnv("GOOGLE_SHEETS_WEBHOOK_URL");
+    const sheetsToken = getEnv("GOOGLE_SHEETS_WEBHOOK_TOKEN");
 
-    const sheetsResponse = await fetch(sheetsWebhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: "scheduling",
-        protocol,
-        scheduling: {
-          fullName: body.fullName,
-          email: body.email,
-          company: body.company,
-          documentId: body.documentId,
-          visitDate: body.visitDate,
-          visitTime: body.visitTime,
-          notes: body.notes,
-          acceptedSafetyRules: body.acceptedSafetyRules,
-        },
-        createdAt: new Date().toISOString(),
-      }),
-    });
+    if (sheetsWebhookUrl) {
+      const sheetsResponse = await fetch(sheetsWebhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "scheduling",
+          protocol,
+          scheduling: {
+            fullName: body.fullName,
+            email: body.email,
+            company: body.company,
+            documentId: body.documentId,
+            visitDate: body.visitDate,
+            visitTime: body.visitTime,
+            notes: body.notes,
+            acceptedSafetyRules: body.acceptedSafetyRules,
+          },
+          sheetsToken: sheetsToken || undefined,
+          createdAt: new Date().toISOString(),
+        }),
+      });
 
-    if (!sheetsResponse.ok) {
-      throw new Error("Falha ao enviar o agendamento para o Google Sheets.");
+      if (!sheetsResponse.ok) {
+        console.error("Falha ao enviar agendamento para Google Sheets", {
+          status: sheetsResponse.status,
+        });
+      }
+    } else {
+      console.warn("GOOGLE_SHEETS_WEBHOOK_URL nao configurada. Seguindo sem salvar na planilha.");
     }
   } catch (error) {
-    return res.status(500).json({
-      message:
-        error instanceof Error
-          ? error.message
-          : "Falha ao configurar o envio para o Google Sheets.",
-    });
+    console.error("Erro ao enviar agendamento para Google Sheets", error);
   }
 
   const response: VisitSchedulingResponse = {

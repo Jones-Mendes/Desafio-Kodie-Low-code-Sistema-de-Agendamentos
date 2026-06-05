@@ -55,11 +55,15 @@ export const handleFinalizeCredential: RequestHandler = async (req, res) => {
 
   try {
     const sheetsWebhookUrl = requireEnv("GOOGLE_SHEETS_WEBHOOK_URL");
+    const sheetsToken = process.env.GOOGLE_SHEETS_WEBHOOK_TOKEN;
 
     const sheetsResponse = await fetch(sheetsWebhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        ...body,
+        sheetsToken: isNonEmpty(sheetsToken) ? sheetsToken : undefined,
+      }),
     });
 
     if (!sheetsResponse.ok) {
