@@ -20,6 +20,11 @@ import {
   VisitSchedulingResponse,
 } from "@shared/api";
 
+type ApiMessageResponse = {
+  message?: string;
+  protocol?: string;
+};
+
 type SchedulingFormState = {
   fullName: string;
   email: string;
@@ -101,6 +106,20 @@ const getTodayISO = () => {
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+};
+
+const parseApiResponse = async (response: Response) => {
+  const contentType = response.headers.get("content-type") ?? "";
+
+  if (contentType.includes("application/json")) {
+    try {
+      return (await response.json()) as ApiMessageResponse;
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
 };
 
 export default function Index() {
@@ -194,13 +213,21 @@ export default function Index() {
         body: JSON.stringify(schedulingForm),
       });
 
-      const data = (await response.json()) as
+      const data = (await parseApiResponse(response)) as
         | VisitSchedulingResponse
-        | { message?: string };
+        | ApiMessageResponse
+        | null;
 
       if (!response.ok) {
         setSchedulingError(
-          data.message ?? "Não foi possível registrar o agendamento.",
+          data?.message ?? "Não foi possível registrar o agendamento.",
+        );
+        return;
+      }
+
+      if (!data || typeof data.protocol !== "string") {
+        setSchedulingError(
+          "Resposta inválida do servidor. Verifique o deploy da API na Vercel.",
         );
         return;
       }
@@ -220,9 +247,7 @@ export default function Index() {
       });
       setSchedulingCompleted(true);
       setCurrentStep(1);
-      if ("protocol" in data && typeof data.protocol === "string") {
-        setSchedulingProtocol(data.protocol);
-      }
+      setSchedulingProtocol(data.protocol);
 
       setSchedulingForm({
         fullName: "",
@@ -319,15 +344,24 @@ export default function Index() {
           }),
         });
 
-        const data = (await response.json()) as
+        const data = (await parseApiResponse(response)) as
           | FinalizeCredentialResponse
-          | { message?: string };
+          | ApiMessageResponse
+          | null;
 
         if (!response.ok) {
           setQuizApproved(false);
           setQuizError(
-            data.message ??
+            data?.message ??
               "Falha ao enviar os dados finais para planilha e e-mail.",
+          );
+          return;
+        }
+
+        if (!data) {
+          setQuizApproved(false);
+          setQuizError(
+            "Resposta inválida do servidor ao finalizar credenciamento.",
           );
           return;
         }
