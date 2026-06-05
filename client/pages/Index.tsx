@@ -397,28 +397,17 @@ export default function Index() {
     setQuizApproved(false);
   };
 
-  const securityLocked = !schedulingCompleted;
-  const trainingLocked = !schedulingCompleted;
-  const quizLocked = !schedulingCompleted;
-
-  const canAccessStep = (index: number) => {
-    if (index === 0) {
-      return true;
-    }
-
-    if (index >= 1 && index <= 3) {
-      return schedulingCompleted;
-    }
-
-    return schedulingCompleted && quizApproved;
-  };
-
   return (
     <div className="min-h-screen bg-ws-light">
       {/* Header Navigation */}
       <header className="bg-white border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex items-center gap-3">
-          <Anchor className="h-8 w-8 text-ws-navy" />
+          <img
+            src="/ws-sons.png"
+            alt="Logo Wilson Sons"
+            className="h-14 w-auto max-w-[160px] object-contain"
+            loading="eager"
+          />
           <h1 className="text-2xl font-bold text-ws-navy">Wilson Sons</h1>
         </div>
       </header>
@@ -509,7 +498,6 @@ export default function Index() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {steps.map((step, idx) => {
               const Icon = step.icon;
-              const isLocked = !canAccessStep(idx);
               return (
                 <div
                   key={idx}
@@ -517,16 +505,10 @@ export default function Index() {
                     idx <= currentStep
                       ? "border-ws-navy bg-blue-50"
                       : "border-gray-200 bg-gray-50"
-                  } ${
-                    isLocked
-                      ? "cursor-not-allowed opacity-60"
-                      : "cursor-pointer hover:shadow-lg"
-                  }`}
+                  } cursor-pointer hover:shadow-lg`}
                   onClick={() => {
-                    if (!isLocked) {
-                      setCurrentStep(idx);
-                      scrollToSection(step.sectionId);
-                    }
+                    setCurrentStep(idx);
+                    scrollToSection(step.sectionId);
                   }}
                 >
                   <div className="flex flex-col items-center gap-2">
@@ -726,9 +708,8 @@ export default function Index() {
       </section>
 
       {/* Security Requirements Section */}
-      <section id="security" className="relative py-16 px-4 sm:px-6 lg:px-8 bg-white">
+      <section id="security" className="py-16 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-7xl mx-auto">
-          <div className={securityLocked ? "pointer-events-none opacity-40 select-none" : ""}>
           <div className="text-center mb-12">
             <h2 className="section-title">Requisitos Obrigatórios de Segurança</h2>
             <p className="section-subtitle">
@@ -800,32 +781,12 @@ export default function Index() {
               </div>
             </div>
           </div>
-          </div>
-
-          {securityLocked && (
-            <div className="absolute inset-0 flex items-center justify-center px-6">
-              <div className="max-w-xl rounded-xl border border-ws-sky bg-white/95 p-6 text-center shadow-xl backdrop-blur-sm">
-                <h3 className="mb-2 text-xl font-bold text-ws-navy">Etapa bloqueada</h3>
-                <p className="mb-4 text-ws-slate">
-                  Finalize o formulário de agendamento para liberar as etapas de segurança.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => scrollToSection("scheduling")}
-                  className="btn-primary"
-                >
-                  Ir para Agendamento
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </section>
 
       {/* Training Video Section */}
-      <section id="training" className="relative py-16 px-4 sm:px-6 lg:px-8 bg-ws-light">
+      <section id="training" className="py-16 px-4 sm:px-6 lg:px-8 bg-ws-light">
         <div className="max-w-5xl mx-auto">
-          <div className={trainingLocked ? "pointer-events-none opacity-40 select-none" : ""}>
           <div className="text-center mb-12">
             <h2 className="section-title">Treinamento de Segurança</h2>
             <p className="section-subtitle">
@@ -849,32 +810,12 @@ export default function Index() {
           <p className="text-center mt-8 text-ws-slate text-lg">
             Após assistir ao vídeo, realize a avaliação de segurança.
           </p>
-          </div>
-
-          {trainingLocked && (
-            <div className="absolute inset-0 flex items-center justify-center px-6">
-              <div className="max-w-xl rounded-xl border border-ws-sky bg-white/95 p-6 text-center shadow-xl backdrop-blur-sm">
-                <h3 className="mb-2 text-xl font-bold text-ws-navy">Treinamento bloqueado</h3>
-                <p className="mb-4 text-ws-slate">
-                  Envie o agendamento da visita para liberar esta etapa.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => scrollToSection("scheduling")}
-                  className="btn-primary"
-                >
-                  Ir para Agendamento
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </section>
 
       {/* Security Quiz Section */}
-      <section id="quiz" className="relative py-16 px-4 sm:px-6 lg:px-8 bg-white">
+      <section id="quiz" className="py-16 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-4xl mx-auto">
-          <div className={quizLocked ? "pointer-events-none opacity-40 select-none" : ""}>
           <div className="text-center mb-12">
             <h2 className="section-title">Quiz de Avaliação de Segurança</h2>
             <p className="section-subtitle mx-auto">
@@ -1113,25 +1054,6 @@ export default function Index() {
               </div>
             )}
           </form>
-          </div>
-
-          {quizLocked && (
-            <div className="absolute inset-0 flex items-center justify-center px-6">
-              <div className="max-w-xl rounded-xl border border-ws-sky bg-white/95 p-6 text-center shadow-xl backdrop-blur-sm">
-                <h3 className="mb-2 text-xl font-bold text-ws-navy">Avaliação bloqueada</h3>
-                <p className="mb-4 text-ws-slate">
-                  Primeiro conclua o formulário de agendamento para desbloquear o quiz.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => scrollToSection("scheduling")}
-                  className="btn-primary"
-                >
-                  Ir para Agendamento
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </section>
 
@@ -1168,7 +1090,7 @@ export default function Index() {
             Wilson Sons - Sistema de Credenciamento de Visitantes
           </p>
           <p className="text-sm text-blue-100">
-            © 2024 Wilson Sons. Todos os direitos reservados.
+            © 2026 Wilson Sons. Todos os direitos reservados.
           </p>
         </div>
       </footer>

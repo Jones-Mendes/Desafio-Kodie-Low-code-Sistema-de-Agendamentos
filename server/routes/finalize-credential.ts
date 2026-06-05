@@ -4,21 +4,18 @@ import {
   FinalizeCredentialRequest,
   FinalizeCredentialResponse,
 } from "../../shared/api";
+import { sendToGoogleSheets } from "../services/google-sheets";
 
 const isNonEmpty = (value: unknown): value is string => {
   return typeof value === "string" && value.trim().length > 0;
 };
 
-const requireEnv = (name: string) => {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Variavel de ambiente ausente: ${name}`);
-  }
-
-  return value;
-};
-
 const finalizedProtocols = new Set<string>();
+
+const getEnv = (name: string) => {
+  const value = process.env[name];
+  return typeof value === "string" ? value.trim() : "";
+};
 
 export const handleFinalizeCredential: RequestHandler = async (req, res) => {
   const body = req.body as Partial<FinalizeCredentialRequest>;
@@ -54,38 +51,24 @@ export const handleFinalizeCredential: RequestHandler = async (req, res) => {
   }
 
   try {
-    const sheetsWebhookUrl = requireEnv("GOOGLE_SHEETS_WEBHOOK_URL");
-    const sheetsToken = process.env.GOOGLE_SHEETS_WEBHOOK_TOKEN;
-
-    const sheetsResponse = await fetch(sheetsWebhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...body,
-        sheetsToken: isNonEmpty(sheetsToken) ? sheetsToken : undefined,
-      }),
+    await sendToGoogleSheets({
+      type: "finalize",
+      ...body,
     });
 
-    if (!sheetsResponse.ok) {
-      throw new Error("Falha ao enviar os dados para a planilha do Google Sheets.");
-    }
+    const smtpHost = getEnv("SMTP_HOST");
+    const smtpPortRaw = getEnv("SMTP_PORT");
+    const smtpUser = getEnv("SMTP_USER");
+    const smtpPass = getEnv("SMTP_PASS");
+    const smtpFrom = getEnv("SMTP_FROM");
+    const notificationEmail = getEnv("NOTIFICATION_EMAIL");
 
-    const smtpHost = requireEnv("SMTP_HOST");
-    const smtpPort = Number(requireEnv("SMTP_PORT"));
-    const smtpUser = requireEnv("SMTP_USER");
-    const smtpPass = requireEnv("SMTP_PASS");
-    const smtpFrom = requireEnv("SMTP_FROM");
-    const notificationEmail = process.env.NOTIFICATION_EMAIL;
-
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: {
-        user: smtpUser,
-        pass: smtpPass,
-      },
-    });
+    const canSendEmail =
+      isNonEmpty(smtpHost) &&
+      isNonEmpty(smtpPortRaw) &&
+      isNonEmpty(smtpUser) &&
+      isNonEmpty(smtpPass) &&
+      isNonEmpty(smtpFrom);
 
     const answerItemsHtml = body.quiz.answers
       .map((answer) => {
@@ -153,24 +136,39 @@ export const handleFinalizeCredential: RequestHandler = async (req, res) => {
       </div>
     `;
 
-    await transporter.sendMail({
-      from: smtpFrom,
-      to: body.scheduling.email,
-      bcc: isNonEmpty(notificationEmail) ? notificationEmail : undefined,
-      subject: "Credenciamento concluido - Wilson Sons",
-      text: [
-        `Ola, ${body.scheduling.fullName}!`,
-        "",
-        "Seu credenciamento foi concluido com sucesso.",
-        `Protocolo: ${body.protocol}`,
-        `Data da visita: ${body.scheduling.visitDate}`,
-        `Horario da visita: ${body.scheduling.visitTime}`,
-        `Resultado do quiz: ${body.quiz.score}/${body.quiz.totalQuestions}`,
-        "",
-        "Aguarde a validacao final da equipe Wilson Sons.",
-      ].join("\n"),
-      html,
-    });
+    if (canSendEmail) {
+      const smtpPort = Number(smtpPortRaw);
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      });
+
+      await transporter.sendMail({
+        from: smtpFrom,
+        to: body.scheduling.email,
+        bcc: isNonEmpty(notificationEmail) ? notificationEmail : undefined,
+        subject: "Credenciamento concluido - Wilson Sons",
+        text: [
+          `Ola, ${body.scheduling.fullName}!`,
+          "",
+          "Seu credenciamento foi concluido com sucesso.",
+          `Protocolo: ${body.protocol}`,
+          `Data da visita: ${body.scheduling.visitDate}`,
+          `Horario da visita: ${body.scheduling.visitTime}`,
+          `Resultado do quiz: ${body.quiz.score}/${body.quiz.totalQuestions}`,
+          "",
+          "Aguarde a validacao final da equipe Wilson Sons.",
+        ].join("\n"),
+        html,
+      });
+    } else {
+      console.warn("SMTP nao configurado. Seguindo sem envio de e-mail.");
+    }
 
     finalizedProtocols.add(body.protocol);
 

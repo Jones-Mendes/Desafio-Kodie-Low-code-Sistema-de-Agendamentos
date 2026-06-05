@@ -3,6 +3,7 @@ import {
   VisitSchedulingRequest,
   VisitSchedulingResponse,
 } from "../../shared/api";
+import { sendToGoogleSheets } from "../services/google-sheets";
 
 const isNonEmpty = (value: unknown): value is string => {
   return typeof value === "string" && value.trim().length > 0;
@@ -24,11 +25,6 @@ const getTodayISO = () => {
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-};
-
-const getEnv = (name: string) => {
-  const value = process.env[name];
-  return typeof value === "string" ? value : "";
 };
 
 export const handleVisitScheduling: RequestHandler = async (req, res) => {
@@ -68,43 +64,21 @@ export const handleVisitScheduling: RequestHandler = async (req, res) => {
 
   const protocol = `WS-${Date.now().toString().slice(-8)}`;
 
-  try {
-    const sheetsWebhookUrl = getEnv("GOOGLE_SHEETS_WEBHOOK_URL");
-    const sheetsToken = getEnv("GOOGLE_SHEETS_WEBHOOK_TOKEN");
-
-    if (sheetsWebhookUrl) {
-      const sheetsResponse = await fetch(sheetsWebhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "scheduling",
-          protocol,
-          scheduling: {
-            fullName: body.fullName,
-            email: body.email,
-            company: body.company,
-            documentId: body.documentId,
-            visitDate: body.visitDate,
-            visitTime: body.visitTime,
-            notes: body.notes,
-            acceptedSafetyRules: body.acceptedSafetyRules,
-          },
-          sheetsToken: sheetsToken || undefined,
-          createdAt: new Date().toISOString(),
-        }),
-      });
-
-      if (!sheetsResponse.ok) {
-        console.error("Falha ao enviar agendamento para Google Sheets", {
-          status: sheetsResponse.status,
-        });
-      }
-    } else {
-      console.warn("GOOGLE_SHEETS_WEBHOOK_URL nao configurada. Seguindo sem salvar na planilha.");
-    }
-  } catch (error) {
-    console.error("Erro ao enviar agendamento para Google Sheets", error);
-  }
+  await sendToGoogleSheets({
+    type: "scheduling",
+    protocol,
+    scheduling: {
+      fullName: body.fullName,
+      email: body.email,
+      company: body.company,
+      documentId: body.documentId,
+      visitDate: body.visitDate,
+      visitTime: body.visitTime,
+      notes: body.notes,
+      acceptedSafetyRules: body.acceptedSafetyRules,
+    },
+    createdAt: new Date().toISOString(),
+  });
 
   const response: VisitSchedulingResponse = {
     message:

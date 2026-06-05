@@ -132,9 +132,12 @@ npm run dev
 
 ## Variáveis de ambiente
 
-Opcional:
+- Obrigatória para integração com planilha:
+  - GOOGLE_SHEETS_WEBHOOK_URL: URL /exec do Apps Script.
 
-- PING_MESSAGE: mensagem personalizada para GET /api/ping.
+- Opcionais:
+  - PING_MESSAGE: mensagem personalizada para GET /api/ping.
+  - SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, NOTIFICATION_EMAIL (somente se quiser envio de e-mail na finalização).
 
 ## Deploy
 
@@ -146,8 +149,8 @@ Configuração principal:
 - Build command: pnpm build:client.
 - Output directory: dist/spa.
 - As rotas de API são atendidas pela Function em api/[...route].ts.
-- Configure na Vercel as variáveis de ambiente usadas pelo backend: GOOGLE_SHEETS_WEBHOOK_URL, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM e, se necessário, NOTIFICATION_EMAIL.
-- Opcional (recomendado): GOOGLE_SHEETS_WEBHOOK_TOKEN para validar um token único no Apps Script.
+- Configuração mínima na Vercel: GOOGLE_SHEETS_WEBHOOK_URL.
+- SMTP é opcional e só necessário se quiser envio de e-mail na finalização.
 - Use [.env.example](.env.example) como referência para cadastrar as variáveis sem expor segredos.
 
 Para o primeiro deploy, basta importar o repositório na Vercel e cadastrar as variáveis de ambiente do backend antes de publicar.
