@@ -26,7 +26,16 @@ const getTodayISO = () => {
   return `${year}-${month}-${day}`;
 };
 
-export const handleVisitScheduling: RequestHandler = (req, res) => {
+const requireEnv = (name: string) => {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Variavel de ambiente ausente: ${name}`);
+  }
+
+  return value;
+};
+
+export const handleVisitScheduling: RequestHandler = async (req, res) => {
   const body = req.body as Partial<VisitSchedulingRequest>;
 
   if (
@@ -62,6 +71,41 @@ export const handleVisitScheduling: RequestHandler = (req, res) => {
   }
 
   const protocol = `WS-${Date.now().toString().slice(-8)}`;
+
+  try {
+    const sheetsWebhookUrl = requireEnv("GOOGLE_SHEETS_WEBHOOK_URL");
+
+    const sheetsResponse = await fetch(sheetsWebhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "scheduling",
+        protocol,
+        scheduling: {
+          fullName: body.fullName,
+          email: body.email,
+          company: body.company,
+          documentId: body.documentId,
+          visitDate: body.visitDate,
+          visitTime: body.visitTime,
+          notes: body.notes,
+          acceptedSafetyRules: body.acceptedSafetyRules,
+        },
+        createdAt: new Date().toISOString(),
+      }),
+    });
+
+    if (!sheetsResponse.ok) {
+      throw new Error("Falha ao enviar o agendamento para o Google Sheets.");
+    }
+  } catch (error) {
+    return res.status(500).json({
+      message:
+        error instanceof Error
+          ? error.message
+          : "Falha ao configurar o envio para o Google Sheets.",
+    });
+  }
 
   const response: VisitSchedulingResponse = {
     message:

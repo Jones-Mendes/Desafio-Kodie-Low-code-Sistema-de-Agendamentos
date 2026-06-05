@@ -1,6 +1,6 @@
 # Google Apps Script para Google Sheets
 
-Atualize o Apps Script do seu Web App com o exemplo abaixo para gravar os dados do credenciamento e todas as respostas do quiz na planilha.
+Atualize o Apps Script do seu Web App com o exemplo abaixo para gravar os dados do agendamento (assim que o formulario e enviado) e os dados finais do credenciamento com as respostas do quiz.
 
 ```javascript
 function doPost(e) {
@@ -40,6 +40,8 @@ function doPost(e) {
       ]);
     }
 
+    var type = body.type || "finalize";
+
     summarySheet.appendRow([
       new Date(),
       body.protocol || "",
@@ -52,21 +54,23 @@ function doPost(e) {
       body.quiz?.score ?? "",
       body.quiz?.totalQuestions ?? "",
       body.quiz?.approved ? "SIM" : "NAO",
-      body.scheduling?.notes || ""
+      (body.scheduling?.notes || "") + " | Tipo: " + type
     ]);
 
     var answers = body.quiz?.answers || [];
 
-    answers.forEach(function(answer) {
-      answersSheet.appendRow([
-        new Date(),
-        body.protocol || "",
-        answer.question || "",
-        answer.selectedAnswer || "",
-        answer.correctAnswer || "",
-        answer.isCorrect ? "SIM" : "NAO"
-      ]);
-    });
+    if (type === "finalize") {
+      answers.forEach(function(answer) {
+        answersSheet.appendRow([
+          new Date(),
+          body.protocol || "",
+          answer.question || "",
+          answer.selectedAnswer || "",
+          answer.correctAnswer || "",
+          answer.isCorrect ? "SIM" : "NAO"
+        ]);
+      });
+    }
 
     return ContentService
       .createTextOutput(JSON.stringify({ ok: true }))
@@ -79,4 +83,4 @@ function doPost(e) {
 }
 ```
 
-Depois de salvar, publique novamente o Web App e mantenha a URL configurada em [.env.example](.env.example).
+Depois de salvar, publique novamente o Web App e mantenha a URL configurada em [.env.example](.env.example) e na variavel GOOGLE_SHEETS_WEBHOOK_URL da Vercel.
