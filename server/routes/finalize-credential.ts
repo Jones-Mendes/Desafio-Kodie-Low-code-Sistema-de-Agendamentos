@@ -3,7 +3,7 @@ import nodemailer from "nodemailer";
 import {
   FinalizeCredentialRequest,
   FinalizeCredentialResponse,
-} from "@shared/api";
+} from "../../shared/api";
 
 const isNonEmpty = (value: unknown): value is string => {
   return typeof value === "string" && value.trim().length > 0;

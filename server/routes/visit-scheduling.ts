@@ -2,7 +2,7 @@ import { RequestHandler } from "express";
 import {
   VisitSchedulingRequest,
   VisitSchedulingResponse,
-} from "@shared/api";
+} from "../../shared/api";
 
 const isNonEmpty = (value: unknown): value is string => {
   return typeof value === "string" && value.trim().length > 0;

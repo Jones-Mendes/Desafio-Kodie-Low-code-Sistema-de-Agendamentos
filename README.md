@@ -61,14 +61,14 @@ Modelo operacional B2B interno (compliance e eficiência), com geração de valo
 
 - Frontend: React + Vite + TypeScript + Tailwind CSS.
 - Backend: Express (endpoints de suporte).
-- Deploy: Netlify (SPA + Function para API).
+- Deploy: Vercel (SPA + Function para API).
 
 ## Estrutura do projeto
 
 - client: aplicação SPA e páginas.
 - server: servidor Express.
 - shared: tipos compartilhados.
-- netlify/functions: adapter serverless da API.
+- api: entrypoint serverless para Vercel.
 
 ## Funcionalidades atuais
 
@@ -136,13 +136,20 @@ Opcional:
 
 - PING_MESSAGE: mensagem personalizada para GET /api/ping.
 
-## Deploy (Netlify)
+## Deploy
+
+### Vercel
 
 Configuração principal:
 
-- Build command: npm run build:client
-- Publish directory: dist/spa
-- Redirecionamento de API para Netlify Function: /.netlify/functions/api/:splat
+- Framework preset: Vite.
+- Build command: pnpm build:client.
+- Output directory: dist/spa.
+- As rotas de API são atendidas pela Function em api/[...route].ts.
+- Configure na Vercel as variáveis de ambiente usadas pelo backend: GOOGLE_SHEETS_WEBHOOK_URL, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM e, se necessário, NOTIFICATION_EMAIL.
+- Use [.env.example](.env.example) como referência para cadastrar as variáveis sem expor segredos.
+
+Para o primeiro deploy, basta importar o repositório na Vercel e cadastrar as variáveis de ambiente do backend antes de publicar.
 
 ## KPIs sugeridos
 
