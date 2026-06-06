@@ -132,8 +132,12 @@ npm run dev
 
 ## Variáveis de ambiente
 
-- Obrigatória para integração com planilha:
-  - GOOGLE_SHEETS_WEBHOOK_URL: URL /exec do Apps Script.
+- Integração com planilha (escolha uma opção):
+  - SHEETDB_API_URL: endpoint da API do SheetDB (URL unica para ambos os fluxos).
+  - SHEETDB_API_URL_SCHEDULING: endpoint especifico para agendamento (opcional).
+  - SHEETDB_API_URL_FINALIZE: endpoint especifico para finalizacao (opcional).
+  - SHEETDB_AUTH_TOKEN: token opcional do SheetDB (se sua API exigir autenticação).
+  - GOOGLE_SHEETS_WEBHOOK_URL: URL /exec do Apps Script (fallback, se não usar SheetDB).
 
 - Opcionais:
   - PING_MESSAGE: mensagem personalizada para GET /api/ping.
@@ -149,9 +153,53 @@ Configuração principal:
 - Build command: pnpm build:client.
 - Output directory: dist/spa.
 - As rotas de API são atendidas pela Function em api/[...route].ts.
-- Configuração mínima na Vercel: GOOGLE_SHEETS_WEBHOOK_URL.
+- Configuração mínima na Vercel para planilha: SHEETDB_API_URL.
+- Se necessario, adicione SHEETDB_AUTH_TOKEN.
+- Se preferir Apps Script, use GOOGLE_SHEETS_WEBHOOK_URL.
 - SMTP é opcional e só necessário se quiser envio de e-mail na finalização.
 - Use [.env.example](.env.example) como referência para cadastrar as variáveis sem expor segredos.
+
+### Integracao com SheetDB (passo a passo)
+
+1. Crie uma planilha com duas abas (recomendado): `scheduling` e `finalize`.
+2. No SheetDB, gere uma API para cada aba e copie as URLs.
+3. Na Vercel, configure:
+  - `SHEETDB_API_URL_SCHEDULING` com a URL da aba `scheduling`.
+  - `SHEETDB_API_URL_FINALIZE` com a URL da aba `finalize`.
+  - `SHEETDB_AUTH_TOKEN` somente se sua API estiver protegida.
+4. Publique novamente o projeto na Vercel.
+
+Colunas esperadas para aba `scheduling`:
+
+- `form_type`
+- `protocol`
+- `full_name`
+- `email`
+- `company`
+- `document_id`
+- `visit_date`
+- `visit_time`
+- `notes`
+- `accepted_safety_rules`
+- `created_at`
+
+Colunas esperadas para aba `finalize`:
+
+- `form_type`
+- `protocol`
+- `full_name`
+- `email`
+- `company`
+- `document_id`
+- `visit_date`
+- `visit_time`
+- `score`
+- `total_questions`
+- `approved`
+- `answered_at`
+- `answers_json`
+- `finalized_at`
+- `payload_json`
 
 Para o primeiro deploy, basta importar o repositório na Vercel e cadastrar as variáveis de ambiente do backend antes de publicar.
 
